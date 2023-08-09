@@ -1,0 +1,10 @@
+<settings>
+   <mirrors>
+      <mirror>
+         <id>other-mirror</id>
+         <name>Other Mirror Repository</name>
+         <url>http://10.100.214.101:8081/repository/maven-central/</url>
+         <mirrorOf>central</mirrorOf>
+      </mirror>
+   </mirrors>
+</settings>

@@ -1,0 +1,60 @@
+image: epay.harbor.com/library/docker:dind
+
+variables:
+  SERVICE_NAME: core-adapter
+  NAMESPACE: bank-adapter
+  KUBECONFIG: /.kube/config
+  REGISTRY_HOST: epay.harbor.com/bank-adapter/${SERVICE_NAME}
+  IMAGE_NAME: ${REGISTRY_HOST}/${CI_COMMIT_BRANCH}
+  IMAGE_TAG: ${CI_COMMIT_SHORT_SHA}
+
+cache:
+  paths:
+    - cicd/
+
+stages:
+  - config
+  - build
+  - deploy
+
+config-cicd:
+  stage: config
+  image: epay.harbor.com/bitnami/git:2.41.0
+  only:
+    - uat
+    - dev
+    - test
+  script:
+    - git config --global http.sslVerify false
+    - rm -rf cicd
+    - git clone -b main https://cicd:glpat-QfdShzps2xUWg74T2Zns@10.100.230.100:8085/devops/cicd-config/${SERVICE_NAME}.git cicd
+    - rm -rf cicd/.git
+
+docker-build:
+  stage: build
+  only:
+    - uat
+    - dev
+    - test
+  script:
+    - docker build --no-cache -f cicd/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} .
+    - docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+    - docker push ${IMAGE_NAME}:${IMAGE_TAG}
+    - docker push ${IMAGE_NAME}:latest
+    - docker rmi ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+
+commit-deploy:
+  image:
+    name: epay.harbor.com/library/kubectl:latest
+  stage: deploy
+  environment:
+    name: production
+  only:
+    - uat
+    - dev
+    - test
+  script:
+    - echo $kube_config | base64 -d > $KUBECONFIG
+    - envsubst < cicd/k8s-deployment.yml > deployment.yml
+    - kubectl --kubeconfig $KUBECONFIG --namespace=${NAMESPACE} apply -f deployment.yml
+  #when: manual
